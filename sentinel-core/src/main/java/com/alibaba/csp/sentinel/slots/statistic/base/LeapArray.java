@@ -39,9 +39,11 @@ import com.alibaba.csp.sentinel.util.TimeUtil;
  * @author Carpenter Lee
  */
 public abstract class LeapArray<T> {
-
+    //单个窗口长度
     protected int windowLengthInMs;
+    //一轮里滑动窗口的总数
     protected int sampleCount;
+    //一轮总时长
     protected int intervalInMs;
 
     protected final AtomicReferenceArray<WindowWrap<T>> array;
@@ -107,7 +109,7 @@ public abstract class LeapArray<T> {
 
     /**
      * Get bucket item at provided timestamp.
-     *
+     * 查找给定时间戳对应的窗口
      * @param timeMillis a valid timestamp in milliseconds
      * @return current bucket item at provided timestamp if the time is valid; null if time is invalid
      */
@@ -115,9 +117,12 @@ public abstract class LeapArray<T> {
         if (timeMillis < 0) {
             return null;
         }
-
+        //获取窗口下标:给定时间与滑动一个窗口的长度取余,得出滑动当前时间是第几个滑动窗口,然后将得到的值与一个滑动周期的窗口总数取模:
+        //公式如下: currentTimestamp/单滑动窗口时长%总滑动窗口数
         int idx = calculateTimeIdx(timeMillis);
         // Calculate current bucket start time.
+        //计算给定时间对应滑动窗口的理论开始时间
+        //公式如下:给定时间 - 给定时间%单个滑动窗口时长
         long windowStart = calculateWindowStart(timeMillis);
 
         /*
@@ -126,6 +131,11 @@ public abstract class LeapArray<T> {
          * (1) Bucket is absent, then just create a new bucket and CAS update to circular array.
          * (2) Bucket is up-to-date, then just return the bucket.
          * (3) Bucket is deprecated, then reset current bucket and clean all deprecated buckets.
+         *
+         * 从数组中获取给定时间的存储窗口数据
+         * (1) 不存在存储窗口的桶,初始化一个存储的桶,使用CAS更新当前数组
+         * (2) 存储数据桶是最新的,直接返回当前桶
+         * (3) 储存数据桶是过期的,重置当前存储的桶,并且清除所有过期的桶
          */
         while (true) {
             WindowWrap<T> old = array.get(idx);
